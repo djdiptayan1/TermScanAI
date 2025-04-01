@@ -1,0 +1,39 @@
+# Environment files
+.env
+.env.*
+*.env
+
+# JSON files
+*.json
+!package.json
+!package-lock.json
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node modules
+node_modules/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build directories
+dist/
+build/
+out/
+
+# Temp files
+*.tmp
+.temp/
+.cache/

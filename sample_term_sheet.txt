@@ -1,0 +1,39 @@
+FOREX OPTION TERM SHEET
+Trade ID: FX20230928001
+
+TRADE DETAILS
+====================
+Trade Date: 28/09/2023
+Value Date: 30/09/2023
+Expiry Date: 28/12/2023
+
+CURRENCY DETAILS
+====================
+Currency: USD
+Underlying Currency: EUR
+Counter Currency: USD
+
+PRICING INFORMATION
+====================
+Spot Price: 1.0523
+Strike Price: 1.0550
+Fixing Level: 1.0535
+
+NOTIONAL AND PREMIUM
+====================
+Notional Amount: 1,000,000 EUR
+Premium Amount: 12,500 USD
+Premium Payment Date: 29/09/2023
+
+COUNTERPARTY INFORMATION
+====================
+Buyer: ABC Capital Ltd
+Seller: XYZ Bank
+Legal Entity Identifier (LEI): 7LTWFZYICNSX8D621K86
+
+ADDITIONAL INFORMATION
+====================
+Settlement: Cash Settlement
+Calculation Agent: XYZ Bank
+Business Day Convention: Modified Following
+Documentation: ISDA 2006 
