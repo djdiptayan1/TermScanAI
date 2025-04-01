@@ -11,7 +11,12 @@ import json
 import getpass
 import sys
 from typing import Dict, Any, Optional
-from fetchEmails import fetch_email_by_trade_id, cleanup_attachments
+from fetchEmails import (
+    fetch_email_by_trade_id,
+    cleanup_attachments,
+    get_email_credentials,
+    extract_trade_details,
+)
 from document_processor import DocumentProcessor
 from dotenv import load_dotenv
 
@@ -37,7 +42,9 @@ def parse_arguments():
 
     # Optional arguments
     parser.add_argument(
-        "--email-user", type=str, help="Email username (if using email mode)"
+        "--email-user",
+        type=str,
+        help="Email username (if using email mode, overrides env var)",
     )
     parser.add_argument(
         "--reference", type=str, help="Path to reference data for validation"
@@ -122,10 +129,22 @@ def process_trade(
         # Add trade ID to result
         result["trade_id"] = trade_id
 
+        # Extract trade details from text
+        trade_details = extract_trade_details(result["text"])
+        trade_details["trade_id"] = trade_id
+
+        # Validate against reference file if provided
+        validation_results = None
+        if reference_file and os.path.exists(reference_file):
+            validation_results = processor.validate_with_reference(
+                trade_details, reference_file
+            )
+            result["validation"] = validation_results
+
         # Export to Excel
         import pandas as pd
 
-        df = pd.DataFrame([result])
+        df = pd.DataFrame([trade_details])
         df.to_excel(output_file, index=False)
         print(f"\nTrade details exported to: {output_file}")
 
@@ -169,6 +188,34 @@ def display_results(result: Dict[str, Any]) -> None:
     print("-" * 50)
     print(json.dumps(result["metadata"], indent=2))
 
+    # Display validation results if available
+    if "validation" in result:
+        validation = result["validation"]
+        print("\nValidation Results:")
+        print("-" * 50)
+
+        if "error" in validation:
+            print(f"Validation Error: {validation['error']}")
+        else:
+            print(
+                f"Validation Status: {'Valid' if validation['is_valid'] else 'Invalid'}"
+            )
+
+            if validation["missing_fields"]:
+                print("\nMissing Fields:")
+                for field in validation["missing_fields"]:
+                    print(f"- {field}")
+
+            if validation["mismatch_fields"]:
+                print("\nMismatched Fields:")
+                for mismatch in validation["mismatch_fields"]:
+                    print(f"- {mismatch['field']}:")
+                    print(f"  Extracted: {mismatch['extracted']}")
+                    print(f"  Reference: {mismatch['reference']}")
+
+            if validation["is_valid"]:
+                print("\nAll fields match the reference data.")
+
 
 def main():
     """Main function"""
@@ -178,17 +225,27 @@ def main():
     # Process based on mode
     if args.email:
         # Email processing mode
-        if not args.email_user:
-            args.email_user = input("Enter email username: ")
-        email_password = getpass.getpass("Enter email password: ")
+        try:
+            # Get email credentials from environment or command line
+            if args.email_user:
+                # If email user is provided, ask for password
+                email_password = getpass.getpass("Enter email password: ")
+                email_credentials = (args.email_user, email_password)
+            else:
+                # Use credentials from environment
+                email_credentials = get_email_credentials()
 
-        result = process_trade(
-            args.trade_id,
-            email_credentials=(args.email_user, email_password),
-            reference_file=args.reference,
-            output_file=args.output,
-            vision_credentials=args.vision_credentials,
-        )
+            result = process_trade(
+                args.trade_id,
+                email_credentials=email_credentials,
+                reference_file=args.reference,
+                output_file=args.output,
+                vision_credentials=args.vision_credentials,
+            )
+        except ValueError as e:
+            print(f"Error: {str(e)}")
+            print("Please set EMAIL and PASSWORD in .env file or provide --email-user")
+            sys.exit(1)
     else:
         # Local file processing mode
         result = process_trade(
