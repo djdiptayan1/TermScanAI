@@ -17,12 +17,16 @@ import cv2
 import numpy as np
 from vision_ocr import VisionOCR
 from typing import Optional, Dict, List, Tuple
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Initialize Google Cloud Vision client
 vision_ocr = None
 
 
-def init_vision_ocr(credentials_path: Optional[str] = None):
+def init_vision_ocr(credentials_path: Optional[str] = None) -> None:
     """Initialize Google Cloud Vision OCR"""
     global vision_ocr
     try:
@@ -31,22 +35,37 @@ def init_vision_ocr(credentials_path: Optional[str] = None):
     except Exception as e:
         print(f"Failed to initialize Google Cloud Vision OCR: {str(e)}")
         print("Falling back to Tesseract OCR")
+        vision_ocr = None
+
+
+def get_email_credentials() -> Tuple[str, str]:
+    """Get email credentials from environment variables."""
+    email_user = os.getenv("EMAIL")
+    email_password = os.getenv("PASSWORD")
+
+    if not email_user or not email_password:
+        raise ValueError("Email credentials not found in environment variables")
+
+    return email_user, email_password
 
 
 def fetch_email_by_trade_id(
-    trade_id: str, email_credentials: Tuple[str, str]
+    trade_id: str, email_credentials: Optional[Tuple[str, str]] = None
 ) -> Optional[Dict]:
     """
     Connect to email server and fetch the latest email containing the trade_id
 
     Args:
         trade_id: The trade ID to search for
-        email_credentials: Tuple of (username, password)
+        email_credentials: Optional tuple of (username, password). If not provided, uses env vars.
 
     Returns:
         Dictionary containing email data and attachments, or None if not found
     """
-    username, password = email_credentials
+    # Use provided credentials or get from environment
+    username, password = (
+        email_credentials if email_credentials else get_email_credentials()
+    )
 
     try:
         # Connect to the server
@@ -306,6 +325,11 @@ def process_trade(trade_id, email_credentials, reference_file=None):
     """
     print(f"Processing trade ID: {trade_id}")
 
+    # Initialize Vision OCR if credentials are available
+    vision_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if vision_credentials:
+        init_vision_ocr(vision_credentials)
+
     # Fetch email with attachments
     email_data = fetch_email_by_trade_id(trade_id, email_credentials)
     if not email_data:
@@ -325,11 +349,6 @@ def process_trade(trade_id, email_credentials, reference_file=None):
 
     # Validate extracted data
     validation_results = validate_trade_details(trade_details, reference_file)
-
-    # Clean up temporary files (optional)
-    # for attachment in email_data['attachments']:
-    #     if os.path.exists(attachment["path"]):
-    #         os.remove(attachment["path"])
 
     return {
         "trade_details": trade_details,
