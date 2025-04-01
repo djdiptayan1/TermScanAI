@@ -6,6 +6,7 @@ Handles PDF, images, screenshots, and Word documents
 import os
 import io
 import mimetypes
+import pandas as pd
 from typing import Optional, Dict, Any, List, Union
 from google.cloud import vision
 import pytesseract
@@ -333,6 +334,90 @@ class DocumentProcessor:
                 None if not doc_response.error.message else doc_response.error.message
             ),
         }
+
+    def validate_with_reference(
+        self, extracted_data: Dict[str, Any], reference_file: str
+    ) -> Dict[str, Any]:
+        """Validate extracted data against reference Excel file.
+
+        Args:
+            extracted_data: Dictionary containing extracted trade details
+            reference_file: Path to reference Excel file
+
+        Returns:
+            Dictionary containing validation results and differences
+        """
+        try:
+            # Read reference data
+            ref_df = pd.read_excel(reference_file)
+            if ref_df.empty:
+                return {
+                    "is_valid": False,
+                    "error": "Reference file is empty",
+                    "missing_fields": [],
+                    "mismatch_fields": [],
+                }
+
+            # Get reference data for the trade ID
+            ref_data = ref_df[ref_df["trade_id"] == extracted_data["trade_id"]]
+            if ref_data.empty:
+                return {
+                    "is_valid": False,
+                    "error": f"No reference data found for trade ID: {extracted_data['trade_id']}",
+                    "missing_fields": [],
+                    "mismatch_fields": [],
+                }
+
+            ref_data = ref_data.iloc[0].to_dict()
+
+            # Initialize validation results
+            validation_results = {
+                "is_valid": True,
+                "missing_fields": [],
+                "mismatch_fields": [],
+                "reference_data": ref_data,
+                "extracted_data": extracted_data,
+            }
+
+            # Check for missing fields
+            for field in ref_data:
+                if field not in extracted_data or extracted_data[field] is None:
+                    validation_results["missing_fields"].append(field)
+                    validation_results["is_valid"] = False
+
+            # Compare values
+            for field in extracted_data:
+                if field in ref_data:
+                    extracted_val = extracted_data[field]
+                    ref_val = ref_data[field]
+
+                    # Handle numeric values
+                    if isinstance(ref_val, (int, float)):
+                        try:
+                            extracted_val = float(extracted_val)
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Compare values
+                    if extracted_val != ref_val:
+                        validation_results["mismatch_fields"].append(
+                            {
+                                "field": field,
+                                "extracted": extracted_val,
+                                "reference": ref_val,
+                            }
+                        )
+                        validation_results["is_valid"] = False
+
+            return validation_results
+
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "error": f"Validation error: {str(e)}",
+                "missing_fields": [],
+                "mismatch_fields": [],
+            }
 
 
 # Example usage
